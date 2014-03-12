@@ -1,7 +1,7 @@
 DownloadFontExample
 ===================
 
-Just a example of downloading extra fonts from Apple.
+Just an example of downloading extra fonts from Apple.
 
 
 
