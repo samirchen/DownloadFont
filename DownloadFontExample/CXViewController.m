@@ -15,6 +15,8 @@
 
 #define BaseTag 100
 
+#define UserDefaultsKeyDownloadedFontURLs @"downloaded_font_urls"
+
 typedef NS_ENUM(NSInteger, FontStatus) {
     FontStatusNotDownloaded = 0,
     FontStatusMatching,
@@ -50,6 +52,26 @@ typedef NS_ENUM(NSInteger, FontStatus) {
 
 #pragma mark - Action
 -(void) loadData {
+    // Register downloaded font.
+    NSDictionary* downloadedFontURLs = [[NSUserDefaults standardUserDefaults] objectForKey:UserDefaultsKeyDownloadedFontURLs];
+    if (downloadedFontURLs) {
+        for (NSString* fontName in [downloadedFontURLs allKeys]) {
+            NSString* fontURLStr = [downloadedFontURLs objectForKey:fontName];
+            NSURL* url = [NSURL URLWithString:fontURLStr];
+            CFErrorRef error;
+            bool isSuc = CTFontManagerRegisterFontsForURL((__bridge CFURLRef)url, kCTFontManagerScopeProcess, &error);
+            if (isSuc) {
+                NSLog(@"Register Font %@ Successfully.", fontName);
+            }
+            else {
+                NSLog(@"Register Font %@ Failed.", fontName);
+                CFStringRef errorDes = CFErrorCopyDescription(error);
+                NSLog(@"Error: %@", errorDes);
+                CFRelease(errorDes);
+            }
+        }
+    }
+    
     // Font names.
     self.fontNames = [@[@"STXingkai-SC-Light", @"DFWaWaSC-W5", @"FZLTXHK--GBK1-0", @"STLibian-SC-Regular", @"LiHeiPro", @"HiraginoSansGB-W3"] mutableCopy];
     // Font status and font downloading progress.
@@ -128,20 +150,34 @@ typedef NS_ENUM(NSInteger, FontStatus) {
         else if (state == kCTFontDescriptorMatchingDidFinish) {
             dispatch_async(dispatch_get_main_queue(), ^ {
 
-                // Log the font URL in the console
-				CTFontRef fontRef = CTFontCreateWithName((__bridge CFStringRef)fontName, 0., NULL);
-                CFStringRef fontURL = CTFontCopyAttribute(fontRef, kCTFontURLAttribute);
-				NSLog(@"Font URL: %@", (__bridge NSURL*)(fontURL));
-                CFRelease(fontURL);
-				CFRelease(fontRef);
                 
                 if (!errorDuringDownload) {
+                    
+                    // Log the font URL in the console
+                    CTFontRef fontRef = CTFontCreateWithName((__bridge CFStringRef)fontName, 0., NULL);
+                    CFStringRef fontURL = CTFontCopyAttribute(fontRef, kCTFontURLAttribute);
+                    NSLog(@"Font URL: %@", (__bridge NSURL*)(fontURL));
+
                     // Update font status.
                     [self.fontStatuses setObject:[NSNumber numberWithInteger:FontStatusDownloaded] forKey:fontName];
                     // Refresh table view cell.
                     [self.tvFonts reloadRowsAtIndexPaths:[NSArray arrayWithObjects:[NSIndexPath indexPathForRow:index inSection:0], nil] withRowAnimation:UITableViewRowAnimationNone];
                     
+                    // Record font url.
+                    NSUserDefaults* userDefaults = [NSUserDefaults standardUserDefaults];
+                    NSMutableDictionary* downloadedFontURLs = [[userDefaults objectForKey:UserDefaultsKeyDownloadedFontURLs] mutableCopy];
+                    if (!downloadedFontURLs) {
+                        downloadedFontURLs = [[NSMutableDictionary alloc] init];
+                    }
+                    [downloadedFontURLs setObject:[(__bridge NSURL*)fontURL absoluteString] forKey:fontName];
+                    [userDefaults setObject:downloadedFontURLs forKey:UserDefaultsKeyDownloadedFontURLs];
+                    [userDefaults synchronize];
+                    
 					NSLog(@"%@ Downloaded.", fontName);
+                    
+                    CFRelease(fontURL);
+                    CFRelease(fontRef);
+
 				}
             });
         }
@@ -201,6 +237,21 @@ typedef NS_ENUM(NSInteger, FontStatus) {
         return (bool)YES;
     });
     
+}
+
+
+-(void) loadFontFromFile:(NSString*)file {
+    NSData *inData = [NSData dataWithContentsOfFile:file];/* your decrypted font-file data */;
+    CFErrorRef error;
+    CGDataProviderRef provider = CGDataProviderCreateWithCFData((CFDataRef)inData);
+    CGFontRef font = CGFontCreateWithDataProvider(provider);
+    if (! CTFontManagerRegisterGraphicsFont(font, &error)) {
+        CFStringRef errorDescription = CFErrorCopyDescription(error);
+        NSLog(@"Failed to load font: %@", errorDescription);
+        CFRelease(errorDescription);
+    }
+    CFRelease(font);
+    CFRelease(provider);
 }
 
 #pragma mark - Utility
@@ -271,7 +322,7 @@ typedef NS_ENUM(NSInteger, FontStatus) {
     }
     else if (fontStatus == FontStatusDownloading) { // downloading...
         UIProgressView* progressView = [[UIProgressView alloc] initWithFrame:CGRectMake(0, 0, 50, 2)];
-        [progressView setProgress:[[self.fontDownloadingProgress objectForKey:fontName] floatValue] animated:YES];
+        [progressView setProgress:[[self.fontDownloadingProgress objectForKey:fontName] floatValue] animated:NO];
         cell.accessoryView = progressView;
         
         cell.accessoryType = UITableViewCellAccessoryNone;
