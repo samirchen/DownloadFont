@@ -8,7 +8,6 @@
 
 #import <UIKit/UIKit.h>
 
-#import <UIKit/UIKit.h>
 
 @interface CXViewController : UIViewController <UITableViewDataSource, UITableViewDelegate>
 
