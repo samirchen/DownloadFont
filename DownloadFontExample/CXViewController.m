@@ -59,7 +59,7 @@ typedef NS_ENUM(NSInteger, FontStatus) {
             NSString* fontURLStr = [downloadedFontURLs objectForKey:fontName];
             NSURL* url = [NSURL URLWithString:fontURLStr];
             CFErrorRef error;
-            bool isSuc = CTFontManagerRegisterFontsForURL((__bridge CFURLRef)url, kCTFontManagerScopeProcess, &error);
+            bool isSuc = CTFontManagerRegisterFontsForURL((__bridge CFURLRef)url, kCTFontManagerScopeProcess, &error); // the url should begin with "file://"
             if (isSuc) {
                 NSLog(@"Register Font %@ Successfully.", fontName);
             }
